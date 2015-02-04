@@ -1,15 +1,21 @@
 import sys
 import math
-import collections
+import operator
 
 from PIL import Image
-from PIL import ImageDraw
+
+# This represents the space between the boundary of the image and the square region
+# in the center of the image.
+BORDER_PERCENT = 0.11
+
+# Number of blocks to crop the image.
+NUMBER_OF_BLOCKS = 1296
 
 # It returns the region of an specific point considering that the image was
 # divided into 5 regions.
 def getRegion(width, height, x, y):
-    imgWBorder = width * 0.10
-    imgHBorder = height * 0.10
+    imgWBorder = width * BORDER_PERCENT
+    imgHBorder = height * BORDER_PERCENT
 
     if (x <= (width / 2) and y <= imgHBorder) or (x <= imgWBorder and y <= height / 2):
         return "A"
@@ -29,54 +35,72 @@ def getRegion(width, height, x, y):
 # This program breaks the image into 1296 blocks and 5 regions and generates histograms to each block. After that, each
 # histogram block becomes words that can be used as terms in a vector model. So that, it can be used together with a
 # vector model to do CBIR (Content Based Information Retrieval).
+# Example:
+#  ___________
+# |A  __|__  B|
+# |__|C    |__|
+# |D |_____| E|
+# |_____|_____|
+#
 def main(argv):
 
-    # if len(sys.argv) < 2 or len(sys.argv) > 2:
-    #     print "This program breaks the image into 1296 blocks and 5 regions and generates histograms to each block. "
-    #     print "After that, each histogram block becomes words that can be used as terms in a vector model. So that, "
-    #     print "it can be used together with a vector model to do CBIR (Content Based Information Retrieval)."
-    #     print "\nImage Histogram Generator usage:"
-    #     print sys.argv[0], '<image_path>'
-    #     sys.exit()
+    if len(sys.argv) < 2 or len(sys.argv) > 2:
+        print "This program breaks the image into 1296 blocks and 5 regions and generates histograms to each block. "
+        print "After that, each histogram block becomes words that can be used as terms in a vector model. So that, "
+        print "it can be used together with a vector model to do CBIR (Content Based Information Retrieval)."
+        print "\nImage Histogram Generator usage:"
+        print sys.argv[0], '<image_path>'
+        sys.exit()
 
-    #im = sys.argv[1]
-    im = Image.open('../lena.jpg')
+    imagePath = sys.argv[1]
+    im = Image.open(imagePath)
 
-    im256 = im.convert('P', palette=Image.ADAPTIVE, colors=255)
+    # Decreasing the quantization of the image to 256 colors
+    img256 = im.convert('P', palette=Image.ADAPTIVE, colors=255)
 
-    width = im.size[0]
-    height = im.size[1]
+    imgWidth = im.size[0]
+    imgHeight = im.size[1]
 
-    draw = ImageDraw.Draw(im256)
-
-    print getRegion(width, height, 52, 196)
-
-    imgWBorder = width * 0.11
-    imgHBorder = height * 0.11
-
-    draw.line((width/2, 0, width/2, imgHBorder), fill=255) # UP
-    draw.line((0, height/2, imgWBorder, height/2), fill=255) # LEFT
-    draw.line((width - imgWBorder, height/2, width, height/2), fill=255) # RIGHT
-    draw.line((width/2, height - imgHBorder, width/2, height), fill=255) # BOTTOM
-
-    NUMBER_OF_BLOCKS = 1296
-
-    blockSize = math.sqrt((width * height) / NUMBER_OF_BLOCKS)
+    blockSize = math.sqrt((imgWidth * imgHeight) / NUMBER_OF_BLOCKS)
 
     yleft = 0
     yright = blockSize
 
-    for i in range(0, 37):
+    blockWords = []
+
+    # 36x36 = 1296 blocks
+    for i in range(0, 36):
         xleft = 0
         xright = blockSize
 
-        for j in range(0, 37):
-            draw.rectangle((xleft, yleft, xright, yright), outline=0)
+        for j in range(0, 36):
+            tmpImg = img256.transform((35, 35), Image.EXTENT, (xleft, yleft, xright, yright))
+            tmpHistogram = tmpImg.histogram() #Generates the histogram to the current block
 
-            # tmpImg = im256.crop((xleft, yleft, xright, yright))
-            # tmpHistogram = tmpImg.histogram()
-            # tmpSortedHistogram = collections.OrderedDict(sorted(tmpHistogram.items(), reverse=True))
-            # len95percent = len(sortedHistogram) * 0.95
+            tmpDictHistogram = {}
+
+            for key, value in enumerate(tmpHistogram):
+                tmpDictHistogram[key] = value
+
+            tmpSortedHistogram = sorted(tmpDictHistogram.items(), key = operator.itemgetter(1), reverse=True)
+
+            len95percent = int(len(tmpSortedHistogram) * 0.95)
+
+            blockWord = ''
+
+            x = 0
+
+            for value in tmpSortedHistogram:
+                if x == len95percent:
+                    break
+
+                blockWord = blockWord + 'x' + str(value[0])
+
+                x = x + 1
+
+            blockWord =  getRegion(imgWidth, imgHeight, xright, yright) + blockWord
+
+            blockWords.append(blockWord)
 
             xleft = xleft + blockSize
             xright = xright + blockSize
@@ -84,8 +108,7 @@ def main(argv):
         yleft = yleft + blockSize
         yright = yright + blockSize
 
-    draw.rectangle((imgWBorder, imgHBorder, width - imgWBorder, height - imgHBorder), outline=255)
+    print ','.join(blockWords)
 
-    im256.convert('RGB').save('../lena256.jpg')
 if __name__ == '__main__':
     main(sys.argv)
