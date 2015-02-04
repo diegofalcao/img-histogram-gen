@@ -74,7 +74,7 @@ def main(argv):
         xright = blockSize
 
         for j in range(0, 36):
-            tmpImg = img256.transform((35, 35), Image.EXTENT, (xleft, yleft, xright, yright))
+            tmpImg = img256.transform((36, 36), Image.EXTENT, (xleft, yleft, xright, yright))
             tmpHistogram = tmpImg.histogram() #Generates the histogram to the current block
 
             tmpDictHistogram = {}
