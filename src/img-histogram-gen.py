@@ -53,7 +53,11 @@ def main(argv):
         sys.exit()
 
     imagePath = sys.argv[1]
-    im = Image.open(imagePath)
+    
+    try:    
+        im = Image.open(imagePath)
+    except:
+        sys.exit() # The image was not found or is corrupted.
 
     # Decreasing the quantization of the image to 256 colors
     img256 = im.convert('P', palette=Image.ADAPTIVE, colors=255)
@@ -108,7 +112,9 @@ def main(argv):
         yleft = yleft + blockSize
         yright = yright + blockSize
 
-    print ','.join(blockWords)
+    print ' '.join(blockWords)
+
+    sys.exit()
 
 if __name__ == '__main__':
     main(sys.argv)
